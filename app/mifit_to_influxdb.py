@@ -229,7 +229,6 @@ def get_band_data(auth_info):
 def write_results(results):
     ''' Open a connection to InfluxDB and write the results in
     '''
-
     with InfluxDBClient(url=INFLUXDB_URL, token=INFLUXDB_TOKEN, org=INFLUXDB_ORG) as _client:
         with _client.write_api() as _write_client:
             # Iterate through the results generating and writing points
@@ -242,10 +241,10 @@ def write_results(results):
                     p = p.field(field, row['fields'][field])
                     
                 p = p.time(row['timestamp'])
-                _write_client.write(INFLUXDB_BUCKET, p)
+                _write_client.write(INFLUXDB_BUCKET, INFLUXDB_ORG, p)
 
-def main():
-	
+
+if __name__== "__main__":
 	# InfluxDB settings
 	INFLUXDB_URL = os.getenv("INFLUXDB_URL", False)
 	INFLUXDB_TOKEN = os.getenv("INFLUXDB_TOKEN", "")
@@ -258,8 +257,6 @@ def main():
 	parser.add_argument("--password",required=True,help="password for login")
 	args=parser.parse_args()
 	auth_info=mifit_auth_email(args.email,args.password)
-	get_band_data(auth_info)
-
-
-if __name__== "__main__":
-	main()
+	result_set = get_band_data(auth_info)
+	# Write into InfluxDB
+	write_results(result_set)
