@@ -102,7 +102,7 @@ def dump_sleep_data(day, slp):
             print(format(minutes_as_time(sleep['start'])),"-",minutes_as_time(),
                 sleep_type)
 
-def extract_sleep_data(ts, slp):
+def extract_sleep_data(ts, slp, day):
     ''' Extract sleep data and format it for feeding into InfluxDB
     '''
     rows = []
@@ -133,7 +133,7 @@ def extract_sleep_data(ts, slp):
                 stage = f"unknown_{sleep['mode']}"
                 
             row = {
-                "timestamp": int(sleep['start']) * 60 * 1000000000, # Convert to nanos 
+                "timestamp": minute_to_timestamp(sleep['start'], day) * 1000000000, # Convert to nanos 
                 fields : {
                     "total_sleep_min" : sleep['stop'] - sleep['start']
                     },
@@ -168,7 +168,7 @@ def dump_step_data(day, stp):
             print(format(minutes_as_time(activity['start'])),"-",minutes_as_time(activity['stop']),
                 activity['step'],'steps',activity_type)
 
-def extract_step_data(ts, stp):
+def extract_step_data(ts, stp, day):
     ''' Extract step data and return in a format ready for feeding
         into InfluxDB
     '''
@@ -202,7 +202,7 @@ def extract_step_data(ts, stp):
                 activity_type = f"unknown_{activity['mode']}"
                 
             row = {
-                "timestamp": int(activity['start']) * 60 * 1000000000, # Convert to nanos TODO 
+                "timestamp": minute_to_timestamp(activity['start'], day) * 1000000000, # Convert to nanos TODO 
                 "fields" : {
                     "total_steps" : activity['step'],
                     "calories" : activity['cal'],
@@ -215,6 +215,18 @@ def extract_step_data(ts, stp):
             }
             rows.append(row)
     return rows
+    
+def minute_to_timestamp(minute, day):
+    ''' Take a count of minutes into the day and a date, then turn into an
+    epoch timestamp
+    '''
+    
+    time_norm = minutes_as_time(minute)
+    date_string = f"{day} {time_norm}"
+    epoch = int(datetime.datetime.strptime(date_string, "%Y-%m-%d %H:%M").strftime('%s'))
+    print(epoch)
+    return epoch
+    
     
 def get_band_data(auth_info):
     ''' Retrieve information for the band/watch associated with the account
@@ -264,11 +276,11 @@ def get_band_data(auth_info):
         for k,v in summary.items():
             if k=='stp':
                 dump_step_data(day,v)
-                result_set = result_set + extract_step_data(ts, v)
+                result_set = result_set + extract_step_data(ts, v, day)
             elif k=='slp':
                 # dump_sleep_data(day,v)
                 # Extract the data
-                result_set = result_set + extract_sleep_data(ts, v)
+                result_set = result_set + extract_sleep_data(ts, v, day)
                 print(result_set)
             else:
                 print(k,"=",v)
