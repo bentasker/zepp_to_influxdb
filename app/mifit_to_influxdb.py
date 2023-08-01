@@ -134,8 +134,11 @@ def extract_sleep_data(ts, slp, day):
         
     rows.append(row)
     
+    sleep_stages = 0
+    stages_counters = {}
     # If there are stages recorded, also log those
     if 'stage' in slp:
+        sleep_stages = len(slp['stage'])
         for sleep in slp['stage']:
             if sleep['mode'] == 4:
                 stage = 'light_sleep'
@@ -155,6 +158,29 @@ def extract_sleep_data(ts, slp, day):
                     }
             }           
             rows.append(row)
+    
+            # Increment the counter for the type
+            # initialising if not already present
+            if stage not in stages_counters:
+                stages_counters[stage] = 0
+            stages_counters[stage] += 1
+    
+    
+    # Record the number of sleep stages
+    row = {
+        "timestamp": int(ts) * 1000000000, # Convert to nanos 
+        "fields" : {
+            "recorded_sleep_stages" : sleep_stages
+            },
+        "tags" : {}
+    }
+        
+    # Add a field for each of the recorded stages_counters 
+    for stage in stages_counters:
+        row['fields'][f"recorded_{stage}_events"] = stages_counters[stage]
+        
+    # Add the record
+    rows.append(row)    
     
     return rows
     
@@ -199,8 +225,11 @@ def extract_step_data(ts, stp, day):
         
     rows.append(row)
     
+    activity_count = 0
+    activity_counters = {}
     # Iterate through any listed stages
     if "stage" in stp:
+        activity_count = len(stp['stage'])        
         for activity in stp['stage']:
             if activity['mode'] == 1:
                 activity_type = 'slow_walking'
@@ -226,6 +255,26 @@ def extract_step_data(ts, stp, day):
                     }
             }
             rows.append(row)
+            
+            # Increment the type specific counter
+            if activity_type not in activity_counters:
+                activity_counters[activity_type] = 0
+            activity_counters[activity_type] += 1
+            
+            
+    # Record the number of activities
+    row = {
+        "timestamp": int(ts) * 1000000000, # Convert to nanos 
+        "fields" : {
+            "recorded_activities" : activity_count
+            },
+        "tags" : {}
+    }
+    for activity in activity_counters:
+        row['fields'][f"recorded_{activity}_events"] = activity_counters[activity]
+    rows.append(row)
+        
+            
     return rows
     
 def minute_to_timestamp(minute, day):
