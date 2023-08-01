@@ -10,17 +10,15 @@
 #
 # pip install influxdb-client
 
-
-import argparse
 import base64
 import datetime
 import json
 import os
 import requests
+import sys
 import urllib.parse
 
 from influxdb_client import InfluxDBClient, Point
-from influxdb_client.client.write_api import SYNCHRONOUS
 
 
 def fail(message):
@@ -340,11 +338,15 @@ if __name__== "__main__":
     # How many days data should we request from the API?
     QUERY_DURATION = int(os.getenv("QUERY_DURATION", 2))
     
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--email",required=True,help="email address for login")
-    parser.add_argument("--password",required=True,help="password for login")
-    args=parser.parse_args()
-    auth_info=mifit_auth_email(args.email,args.password)
+    # Get the Zepp credentials
+    ZEPP_EMAIL = os.getenv("ZEPP_EMAIL", False)
+    ZEPP_PASS = os.getenv("ZEPP_PASS", False)
+    
+    if not ZEPP_EMAIL or not ZEPP_PASS:
+        print("Error: Credentials not provided")
+        sys.exit(1)
+    
+    auth_info=mifit_auth_email(ZEPP_EMAIL, ZEPP_PASS)
     result_set, serial = get_band_data(auth_info, QUERY_DURATION)
     # Write into InfluxDB
     write_results(result_set, serial)
