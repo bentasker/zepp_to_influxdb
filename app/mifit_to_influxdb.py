@@ -99,9 +99,56 @@ def dump_sleep_data(day, slp):
 				sleep_type='deep sleep'
 			else:
 				sleep_type="unknown sleep type: {}".format(sleep['mode'])
-			print(format(minutes_as_time(sleep['start'])),"-",minutes_as_time(sleep['stop']),
+			print(format(minutes_as_time(sleep['start'])),"-",minutes_as_time(),
 				sleep_type)
 
+def extract_sleep_data(ts, slp):
+	''' Extract sleep data and format it for feeding into InfluxDB
+	'''
+	rows = []
+	row = {
+		"timestamp": int(ts) * 1000000000, # Convert to nanos 
+		"fields" : {
+			"total_sleep_min" : slp['lt']+slp['dp'],
+			"deep_sleep_min" : slp['dp'],
+			"rem_sleep_min" : slp['lt'],
+			"slept_from" : str(datetime.datetime.fromtimestamp(slp['st'])),
+			"slept_to" : str(datetime.datetime.fromtimestamp(slp['ed'])),
+			},
+		"tags" : {
+			"activity_type" : "sleep"
+			}
+	}
+		
+	rows.append(row)
+	
+	# If there are stages recorded, also log those
+	if 'stage' in slp:
+		for sleep in slp['stage']:
+			if sleep['mode'] == 4:
+				stage = 'light_sleep'
+			elif sleep['mode'] == 5:
+				stage = 'deep_sleep'
+			else:
+				stage = f"unknown_{sleep['mode']}"
+				
+			row = {
+				"timestamp": sleep['start'] * 60 * 1000000000, # Convert to nanos 
+				fields : {
+					"total_sleep_min" : sleep['stop'] - sleep['start']
+					},
+				tags : {
+					"activity_type" : "sleep_stage",
+					"sleep_type" : stage
+					}
+			}			
+			rows.append(row)
+	
+	return rows
+	
+	
+	
+	
 def dump_step_data(day, stp):
 	''' Output the collected step data 
 	'''
@@ -124,6 +171,7 @@ def dump_step_data(day, stp):
 def get_band_data(auth_info):
 	''' Retrieve information for the band/watch associated with the account
 	'''
+	result_set = []
 	print("Retrieveing mi band data")
 	band_data_url='https://api-mifit.huami.com/v1/data/band_data.json'
 	headers={
@@ -137,18 +185,46 @@ def get_band_data(auth_info):
 		'to_date': '2023-08-02',
 	}
 	response=requests.get(band_data_url,params=data,headers=headers)
-	print(response.text)
+	
+	''' We need to calculare today's midnight so that we can assess whether
+	a date entry relates to today or not.
+	
+	The idea being that we want to write points throughout the current day
+	but for previous days only want to write/update the previous entry
+	'''
+	today = datetime.datetime.today()
+	midnight = datetime.datetime.combine(today, datetime.datetime.min.time())
+	today_ts = today.strftime('%s')
+	
 	for daydata in response.json()['data']:
 		day = daydata['date_time']
 		print(day)
+		# Parse the date into a datetime
+		day_ts = datetime.datetime.strptime(daydata['date_time'], '%Y-%m-%d')
+		
+		# If day_ts is < midnight we want to set the timestamp to be 23:59:59 
+		# on that day. If not, then we use the current timestamp.
+		print(day_ts)
+		print(midnight)
+		print(today_ts)
+		if day_ts < midnight:
+			ts = day_ts.strftime('%s')
+		else:
+			ts = today_ts
+		
 		summary=json.loads(base64.b64decode(daydata['summary']))
 		for k,v in summary.items():
 			if k=='stp':
 				dump_step_data(day,v)
 			elif k=='slp':
-				dump_sleep_data(day,v)
+				# dump_sleep_data(day,v)
+				# Extract the data
+				result_set = result_set + extract_sleep_data(ts, v)
+				print(result_set)
 			else:
 				print(k,"=",v)
+				
+	return result_set
 
 def write_results(results):
     ''' Open a connection to InfluxDB and write the results in
