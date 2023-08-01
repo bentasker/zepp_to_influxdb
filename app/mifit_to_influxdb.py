@@ -227,11 +227,27 @@ def minute_to_timestamp(minute, day):
     return epoch
     
     
-def get_band_data(auth_info):
+def get_band_data(auth_info, num_days):
     ''' Retrieve information for the band/watch associated with the account
     '''
     result_set = []
     serial = "unknown"
+    
+    ''' We need to calculate today's midnight so that we can assess whether
+    a date entry relates to today or not.
+    
+    The idea being that we want to write points throughout the current day
+    but for previous days only want to write/update the previous entry
+    
+    The value of today will also be used to construct the query string presented
+    to the api
+    '''
+    today = datetime.datetime.today()
+    midnight = datetime.datetime.combine(today, datetime.datetime.min.time())
+    today_ts = today.strftime('%s')    
+    
+    query_start = today - datetime.timedelta(days=num_days)
+    
     
     print("Retrieving mi band data")
     band_data_url='https://api-mifit.huami.com/v1/data/band_data.json'
@@ -242,20 +258,10 @@ def get_band_data(auth_info):
         'query_type': 'summary',
         'device_type': 'android_phone',
         'userid': auth_info['token_info']['user_id'],
-        'from_date': '2023-07-01',
-        'to_date': '2023-08-02',
+        'from_date': query_start.strftime('%Y-%m-%d'),
+        'to_date': today.strftime('%Y-%m-%d'),
     }
     response=requests.get(band_data_url,params=data,headers=headers)
-    
-    ''' We need to calculare today's midnight so that we can assess whether
-    a date entry relates to today or not.
-    
-    The idea being that we want to write points throughout the current day
-    but for previous days only want to write/update the previous entry
-    '''
-    today = datetime.datetime.today()
-    midnight = datetime.datetime.combine(today, datetime.datetime.min.time())
-    today_ts = today.strftime('%s')
     
     for daydata in response.json()['data']:
         day = daydata['date_time']
@@ -331,11 +337,14 @@ if __name__== "__main__":
     INFLUXDB_MEASUREMENT = os.getenv("INFLUXDB_MEASUREMENT", "gadgetbridge")
     INFLUXDB_BUCKET = os.getenv("INFLUXDB_BUCKET", "testing_db")
     
+    # How many days data should we request from the API?
+    QUERY_DURATION = int(os.getenv("QUERY_DURATION", 2))
+    
     parser = argparse.ArgumentParser()
     parser.add_argument("--email",required=True,help="email address for login")
     parser.add_argument("--password",required=True,help="password for login")
     args=parser.parse_args()
     auth_info=mifit_auth_email(args.email,args.password)
-    result_set, serial = get_band_data(auth_info)
+    result_set, serial = get_band_data(auth_info, QUERY_DURATION)
     # Write into InfluxDB
     write_results(result_set, serial)
