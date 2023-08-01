@@ -338,8 +338,8 @@ def main():
     config['INFLUXDB_URL'] = os.getenv("INFLUXDB_URL", False)
     config['INFLUXDB_TOKEN'] = os.getenv("INFLUXDB_TOKEN", "")
     config['INFLUXDB_ORG'] = os.getenv("INFLUXDB_ORG", "")
-    config['INFLUXDB_MEASUREMENT'] = os.getenv("INFLUXDB_MEASUREMENT", "gadgetbridge")
-    config['INFLUXDB_BUCKET'] = os.getenv("INFLUXDB_BUCKET", "testing_db")
+    config['INFLUXDB_MEASUREMENT'] = os.getenv("INFLUXDB_MEASUREMENT", "zepp")
+    config['INFLUXDB_BUCKET'] = os.getenv("INFLUXDB_BUCKET", "telegraf")
     
     # How many days data should we request from the API?
     config['QUERY_DURATION'] = int(os.getenv("QUERY_DURATION", 2))
