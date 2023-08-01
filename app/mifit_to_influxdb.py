@@ -266,11 +266,8 @@ def get_band_data(auth_info):
         
         # If day_ts is < midnight we want to set the timestamp to be 23:59:59 
         # on that day. If not, then we use the current timestamp.
-        print(day_ts)
-        print(midnight)
-        print(today_ts)
         if day_ts < midnight:
-            ts = day_ts.strftime('%s')
+            ts = datetime.datetime.combine(day_ts, datetime.datetime.max.time()).strftime('%s')
         else:
             ts = today_ts
         
