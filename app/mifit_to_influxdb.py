@@ -225,7 +225,7 @@ def minute_to_timestamp(minute, day):
     return epoch
     
     
-def get_band_data(auth_info, num_days):
+def get_band_data(auth_info, config):
     ''' Retrieve information for the band/watch associated with the account
     '''
     result_set = []
@@ -244,7 +244,7 @@ def get_band_data(auth_info, num_days):
     midnight = datetime.datetime.combine(today, datetime.datetime.min.time())
     today_ts = today.strftime('%s')    
     
-    query_start = today - datetime.timedelta(days=num_days)
+    query_start = today - datetime.timedelta(days=config['QUERY_DURATION'])
     
     
     print("Retrieving mi band data")
@@ -307,14 +307,14 @@ def get_band_data(auth_info, num_days):
                 
     return result_set, serial
 
-def write_results(results, serial):
+def write_results(results, serial, config):
     ''' Open a connection to InfluxDB and write the results in
     '''
-    with InfluxDBClient(url=INFLUXDB_URL, token=INFLUXDB_TOKEN, org=INFLUXDB_ORG) as _client:
+    with InfluxDBClient(url=config['INFLUXDB_URL'], token=config['INFLUXDB_TOKEN'], org=config['INFLUXDB_ORG']) as _client:
         with _client.write_api() as _write_client:
             # Iterate through the results generating and writing points
             for row in results:
-                p = Point(INFLUXDB_MEASUREMENT)
+                p = Point(config['INFLUXDB_MEASUREMENT'])
                 for tag in row['tags']:
                     p = p.tag(tag, row['tags'][tag])
                 
@@ -324,29 +324,43 @@ def write_results(results, serial):
                     p = p.field(field, row['fields'][field])
                     
                 p = p.time(row['timestamp'])
-                _write_client.write(INFLUXDB_BUCKET, INFLUXDB_ORG, p)
+                _write_client.write(config['INFLUXDB_BUCKET'], config['INFLUXDB_ORG'], p)
 
 
-if __name__== "__main__":
+def main():
+    ''' Main entry point
+    '''
+    
+    # Collect config
+    config = {}
+    
     # InfluxDB settings
-    INFLUXDB_URL = os.getenv("INFLUXDB_URL", False)
-    INFLUXDB_TOKEN = os.getenv("INFLUXDB_TOKEN", "")
-    INFLUXDB_ORG = os.getenv("INFLUXDB_ORG", "")
-    INFLUXDB_MEASUREMENT = os.getenv("INFLUXDB_MEASUREMENT", "gadgetbridge")
-    INFLUXDB_BUCKET = os.getenv("INFLUXDB_BUCKET", "testing_db")
+    config['INFLUXDB_URL'] = os.getenv("INFLUXDB_URL", False)
+    config['INFLUXDB_TOKEN'] = os.getenv("INFLUXDB_TOKEN", "")
+    config['INFLUXDB_ORG'] = os.getenv("INFLUXDB_ORG", "")
+    config['INFLUXDB_MEASUREMENT'] = os.getenv("INFLUXDB_MEASUREMENT", "gadgetbridge")
+    config['INFLUXDB_BUCKET'] = os.getenv("INFLUXDB_BUCKET", "testing_db")
     
     # How many days data should we request from the API?
-    QUERY_DURATION = int(os.getenv("QUERY_DURATION", 2))
+    config['QUERY_DURATION'] = int(os.getenv("QUERY_DURATION", 2))
     
     # Get the Zepp credentials
-    ZEPP_EMAIL = os.getenv("ZEPP_EMAIL", False)
-    ZEPP_PASS = os.getenv("ZEPP_PASS", False)
+    config['ZEPP_EMAIL'] = os.getenv("ZEPP_EMAIL", False)
+    config['ZEPP_PASS'] = os.getenv("ZEPP_PASS", False)
     
-    if not ZEPP_EMAIL or not ZEPP_PASS:
+    if not config['ZEPP_EMAIL'] or not config['ZEPP_PASS']:
         print("Error: Credentials not provided")
         sys.exit(1)
     
-    auth_info=mifit_auth_email(ZEPP_EMAIL, ZEPP_PASS)
-    result_set, serial = get_band_data(auth_info, QUERY_DURATION)
+    # Get logged in
+    auth_info=mifit_auth_email(config['ZEPP_EMAIL'], config['ZEPP_PASS'])
+    
+    # Fetch band info
+    result_set, serial = get_band_data(auth_info, config)
+    
     # Write into InfluxDB
-    write_results(result_set, serial)
+    write_results(result_set, serial, config)
+
+
+if __name__== "__main__":
+    main()
