@@ -232,6 +232,8 @@ def get_band_data(auth_info):
     ''' Retrieve information for the band/watch associated with the account
     '''
     result_set = []
+    serial = "unknown"
+    
     print("Retrieveing mi band data")
     band_data_url='https://api-mifit.huami.com/v1/data/band_data.json'
     headers={
@@ -282,12 +284,22 @@ def get_band_data(auth_info):
                 # Extract the data
                 result_set = result_set + extract_sleep_data(ts, v, day)
                 print(result_set)
+            elif k == "goal":
+                result_set.append({
+                "timestamp": int(ts) * 1000000000, # Convert to nanos
+                "fields" : {
+                    "step_goal" : int(v),
+                    },
+                "tags" : {}
+            })
+            elif k == "sn":
+                serial = v
             else:
                 print(k,"=",v)
                 
-    return result_set
+    return result_set, serial
 
-def write_results(results):
+def write_results(results, serial):
     ''' Open a connection to InfluxDB and write the results in
     '''
     with InfluxDBClient(url=INFLUXDB_URL, token=INFLUXDB_TOKEN, org=INFLUXDB_ORG) as _client:
@@ -297,7 +309,9 @@ def write_results(results):
                 p = Point(INFLUXDB_MEASUREMENT)
                 for tag in row['tags']:
                     p = p.tag(tag, row['tags'][tag])
-                    
+                
+                p = p.tag("serial_num", serial)
+                
                 for field in row['fields']:
                     p = p.field(field, row['fields'][field])
                     
@@ -318,6 +332,6 @@ if __name__== "__main__":
     parser.add_argument("--password",required=True,help="password for login")
     args=parser.parse_args()
     auth_info=mifit_auth_email(args.email,args.password)
-    result_set = get_band_data(auth_info)
+    result_set, serial = get_band_data(auth_info)
     # Write into InfluxDB
-    write_results(result_set)
+    write_results(result_set, serial)
