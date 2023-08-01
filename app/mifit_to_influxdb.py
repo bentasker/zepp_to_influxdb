@@ -133,7 +133,7 @@ def extract_sleep_data(ts, slp):
                 stage = f"unknown_{sleep['mode']}"
                 
             row = {
-                "timestamp": sleep['start'] * 60 * 1000000000, # Convert to nanos 
+                "timestamp": int(sleep['start']) * 60 * 1000000000, # Convert to nanos 
                 fields : {
                     "total_sleep_min" : sleep['stop'] - sleep['start']
                     },
@@ -168,6 +168,54 @@ def dump_step_data(day, stp):
             print(format(minutes_as_time(activity['start'])),"-",minutes_as_time(activity['stop']),
                 activity['step'],'steps',activity_type)
 
+def extract_step_data(ts, stp):
+    ''' Extract step data and return in a format ready for feeding
+        into InfluxDB
+    '''
+    rows = []
+    row = {
+        "timestamp": int(ts) * 1000000000, # Convert to nanos 
+        "fields" : {
+            "total_steps" : stp['ttl'],
+            "calories" : stp['cal'],            
+            "distance_m" : stp['dis']
+            },
+        "tags" : {
+            "activity_type" : "steps"
+            }
+    }
+        
+    rows.append(row)
+    
+    # Iterate through any listed stages
+    if "stage" in stp:
+        for activity in stp['stage']:
+            if activity['mode'] == 1:
+                activity_type = 'slow_walking'
+            elif activity['mode'] == 3:
+                activity_type = 'fast_walking'
+            elif activity['mode'] == 4:
+                activity_type = 'running'
+            elif activity['mode'] == 7:
+                activity_type = 'light_activity'
+            else:
+                activity_type = f"unknown_{activity['mode']}"
+                
+            row = {
+                "timestamp": int(activity['start']) * 60 * 1000000000, # Convert to nanos TODO 
+                "fields" : {
+                    "total_steps" : activity['step'],
+                    "calories" : activity['cal'],
+                    "distance_m" : stp['dis'],
+                    "activity_duration_m" : activity['stop'] - activity['start'],            
+                    },
+                "tags" : {
+                    "activity_type" : activity_type
+                    }
+            }
+            rows.append(row)
+    return rows
+    
 def get_band_data(auth_info):
     ''' Retrieve information for the band/watch associated with the account
     '''
@@ -216,6 +264,7 @@ def get_band_data(auth_info):
         for k,v in summary.items():
             if k=='stp':
                 dump_step_data(day,v)
+                result_set = result_set + extract_step_data(ts, v)
             elif k=='slp':
                 # dump_sleep_data(day,v)
                 # Extract the data
