@@ -224,7 +224,6 @@ def minute_to_timestamp(minute, day):
     time_norm = minutes_as_time(minute)
     date_string = f"{day} {time_norm}"
     epoch = int(datetime.datetime.strptime(date_string, "%Y-%m-%d %H:%M").strftime('%s'))
-    print(epoch)
     return epoch
     
     
@@ -234,7 +233,7 @@ def get_band_data(auth_info):
     result_set = []
     serial = "unknown"
     
-    print("Retrieveing mi band data")
+    print("Retrieving mi band data")
     band_data_url='https://api-mifit.huami.com/v1/data/band_data.json'
     headers={
         'apptoken': auth_info['token_info']['app_token'],
@@ -274,25 +273,33 @@ def get_band_data(auth_info):
         summary=json.loads(base64.b64decode(daydata['summary']))
         for k,v in summary.items():
             if k=='stp':
-                dump_step_data(day,v)
+                # dump_step_data(day,v)
+                # Extract step data
                 result_set = result_set + extract_step_data(ts, v, day)
             elif k=='slp':
                 # dump_sleep_data(day,v)
                 # Extract the data
                 result_set = result_set + extract_sleep_data(ts, v, day)
-                print(result_set)
             elif k == "goal":
                 result_set.append({
-                "timestamp": int(ts) * 1000000000, # Convert to nanos
-                "fields" : {
-                    "step_goal" : int(v),
-                    },
-                "tags" : {}
-            })
+                    "timestamp": int(ts) * 1000000000, # Convert to nanos
+                    "fields" : {
+                        "step_goal" : int(v),
+                        },
+                    "tags" : {}
+                })
             elif k == "sn":
                 serial = v
+            elif k == "sync":
+                result_set.append({
+                    "timestamp": int(ts) * 1000000000, # Convert to nanos
+                    "fields" : {
+                        "last_sync" : int(v),
+                        },
+                    "tags" : {}
+                })                
             else:
-                print(k,"=",v)
+                print(f"Skipped {k} = {v}")
                 
     return result_set, serial
 
