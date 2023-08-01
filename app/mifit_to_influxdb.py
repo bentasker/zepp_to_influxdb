@@ -1,5 +1,15 @@
-
 #!/usr/bin/env python3
+#
+#
+# Mi-Fit API to InfluxDB
+#
+# Polls the Mi-Fit/Zepp API to retrieve smart-band information
+# then writes stepcounts etc onwards to InfluxDB
+#
+# Credit for API comms approach goes to https://github.com/micw/hacking-mifit-api
+#
+#
+
 
 import argparse
 import requests
@@ -13,6 +23,9 @@ def fail(message):
 	quit(1)
 
 def mifit_auth_email(email,password):
+	''' Log into the Mifit API using username and password
+	    in order to acquire an access token
+	'''
 	print("Logging in with email {}".format(email))
 	auth_url='https://api-user.huami.com/registrations/{}/tokens'.format(urllib.parse.quote(email))
 	data={
@@ -41,6 +54,10 @@ def mifit_auth_email(email,password):
 	})
 
 def mifit_login_with_token(login_data):
+	''' Log into the API using an access token
+	
+		This is the second stage of the login process
+	'''
 	login_url='https://account.huami.com/v2/client/login'
 	data={
 		'app_name': 'com.xiaomi.hm.health',
@@ -57,9 +74,13 @@ def mifit_login_with_token(login_data):
 	return result;
 
 def minutes_as_time(minutes):
+	''' Convert a minute counter to a human readable time 
+	'''
 	return "{:02d}:{:02d}".format((minutes//60)%24,minutes%60)
 
 def dump_sleep_data(day, slp):
+	''' Output the collected sleep data 
+	'''
 	print("Total sleep: ",minutes_as_time(slp['lt']+slp['dp']),
 		", deep sleep",minutes_as_time(slp['dp']),
 		", light sleep",minutes_as_time(slp['lt']),
@@ -77,6 +98,8 @@ def dump_sleep_data(day, slp):
 				sleep_type)
 
 def dump_step_data(day, stp):
+	''' Output the collected step data 
+	'''
 	print("Total steps: ",stp['ttl'],", used",stp['cal'],"kcals",", walked",stp['dis'],"meters")
 	if 'stage' in stp:
 		for activity in stp['stage']:
@@ -94,6 +117,8 @@ def dump_step_data(day, stp):
 				activity['step'],'steps',activity_type)
 
 def get_band_data(auth_info):
+	''' Retrieve information for the band/watch associated with the account
+	'''
 	print("Retrieveing mi band data")
 	band_data_url='https://api-mifit.huami.com/v1/data/band_data.json'
 	headers={
