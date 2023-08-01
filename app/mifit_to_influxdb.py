@@ -8,15 +8,20 @@
 #
 # Credit for API comms approach goes to https://github.com/micw/hacking-mifit-api
 #
-#
+# pip install influxdb-client
 
 
 import argparse
-import requests
-import urllib.parse
-import json
 import base64
 import datetime
+import json
+import os
+import requests
+import urllib.parse
+
+from influxdb_client import InfluxDBClient, Point
+from influxdb_client.client.write_api import SYNCHRONOUS
+
 
 def fail(message):
 	print("Error: {}".format(message))
@@ -132,7 +137,7 @@ def get_band_data(auth_info):
 		'to_date': '2023-08-02',
 	}
 	response=requests.get(band_data_url,params=data,headers=headers)
-	print(response.json())
+	print(response.text)
 	for daydata in response.json()['data']:
 		day = daydata['date_time']
 		print(day)
@@ -145,7 +150,33 @@ def get_band_data(auth_info):
 			else:
 				print(k,"=",v)
 
+def write_results(results):
+    ''' Open a connection to InfluxDB and write the results in
+    '''
+
+    with InfluxDBClient(url=INFLUXDB_URL, token=INFLUXDB_TOKEN, org=INFLUXDB_ORG) as _client:
+        with _client.write_api() as _write_client:
+            # Iterate through the results generating and writing points
+            for row in results:
+                p = Point(INFLUXDB_MEASUREMENT)
+                for tag in row['tags']:
+                    p = p.tag(tag, row['tags'][tag])
+                    
+                for field in row['fields']:
+                    p = p.field(field, row['fields'][field])
+                    
+                p = p.time(row['timestamp'])
+                _write_client.write(INFLUXDB_BUCKET, p)
+
 def main():
+	
+	# InfluxDB settings
+	INFLUXDB_URL = os.getenv("INFLUXDB_URL", False)
+	INFLUXDB_TOKEN = os.getenv("INFLUXDB_TOKEN", "")
+	INFLUXDB_ORG = os.getenv("INFLUXDB_ORG", "")
+	INFLUXDB_MEASUREMENT = os.getenv("INFLUXDB_MEASUREMENT", "gadgetbridge")
+	INFLUXDB_BUCKET = os.getenv("INFLUXDB_BUCKET", "testing_db")
+	
 	parser = argparse.ArgumentParser()
 	parser.add_argument("--email",required=True,help="email address for login")
 	parser.add_argument("--password",required=True,help="password for login")
