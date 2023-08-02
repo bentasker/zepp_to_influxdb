@@ -149,10 +149,10 @@ def extract_sleep_data(ts, slp, day):
                 
             row = {
                 "timestamp": minute_to_timestamp(sleep['start'], day) * 1000000000, # Convert to nanos 
-                fields : {
+                "fields" : {
                     "total_sleep_min" : sleep['stop'] - sleep['start']
                     },
-                tags : {
+                "tags" : {
                     "activity_type" : "sleep_stage",
                     "sleep_type" : stage
                     }
