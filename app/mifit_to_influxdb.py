@@ -144,11 +144,17 @@ def extract_sleep_data(ts, slp, day):
                 stage = 'light_sleep'
             elif sleep['mode'] == 5:
                 stage = 'deep_sleep'
+            elif sleep['mode'] == 7:
+                stage = 'awake'                
+            elif sleep['mode'] == 8:
+                stage = 'REM'                
             else:
                 stage = f"unknown_{sleep['mode']}"
                 
+            start_epoch = minute_to_timestamp(sleep['start'], day)
+            
             row = {
-                "timestamp": minute_to_timestamp(sleep['start'], day) * 1000000000, # Convert to nanos 
+                "timestamp": start_epoch * 1000000000, # Convert to nanos 
                 "fields" : {
                     "total_sleep_min" : sleep['stop'] - sleep['start']
                     },
@@ -158,7 +164,25 @@ def extract_sleep_data(ts, slp, day):
                     }
             }           
             rows.append(row)
-    
+
+            # Create points for every minute in this state.
+            stop_epoch = minute_to_timestamp(sleep['stop'], day)
+            
+            s = start_epoch
+            while s <= stop_epoch:
+                row = {
+                    "timestamp": s * 1000000000, # Convert to nanos 
+                    "fields" : {
+                        "current_sleep_state" : stage,
+                        "current_sleep_state_int" : sleep['mode'],
+                        },
+                    "tags" : {
+                        "activity_type" : "sleep_stage_tracker"
+                        }
+                }           
+                rows.append(row)
+                s += 60
+            
             # Increment the counter for the type
             # initialising if not already present
             if stage not in stages_counters:
@@ -241,9 +265,11 @@ def extract_step_data(ts, stp, day):
                 activity_type = 'light_activity'
             else:
                 activity_type = f"unknown_{activity['mode']}"
-                
+            
+            start_epoch = minute_to_timestamp(activity['start'], day)
+            
             row = {
-                "timestamp": minute_to_timestamp(activity['start'], day) * 1000000000, # Convert to nanos TODO 
+                "timestamp": start_epoch * 1000000000, # Convert to nanos TODO 
                 "fields" : {
                     "total_steps" : activity['step'],
                     "calories" : activity['cal'],
@@ -260,6 +286,24 @@ def extract_step_data(ts, stp, day):
             if activity_type not in activity_counters:
                 activity_counters[activity_type] = 0
             activity_counters[activity_type] += 1
+            
+            # Create an entry for each minute of this activity
+            end_epoch = minute_to_timestamp(activity['stop'], day)
+            s = start_epoch
+            while s <= end_epoch:
+                row = {
+                    "timestamp": s * 1000000000, # Convert to nanos 
+                    "fields" : {
+                        "current_activity_type" : activity_type,
+                        "current_activity_type_int" : activity['mode'],
+                        },
+                    "tags" : {
+                        "activity_type" : "activity_type_tracker"
+                        }
+                }           
+                rows.append(row)
+                s += 60
+
             
             
     # Record the number of activities
