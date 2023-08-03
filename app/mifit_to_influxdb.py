@@ -415,6 +415,84 @@ def get_band_data(auth_info, config):
     return result_set, serial
 
 
+def get_blood_oxygen_data(auth_info, config):    
+    ''' Retrieve stress level information
+    '''
+    rows = []
+    
+    ''' calculate the times that the api query should check between
+    '''
+    today = datetime.datetime.today()
+    today_end = datetime.datetime.combine(today, datetime.datetime.max.time()) 
+    
+    query_start_d = today - datetime.timedelta(days=config['QUERY_DURATION'])
+    # Make it midnight  - the api doesn't seem to like mid-day queries
+    query_start = datetime.datetime.combine(query_start_d, datetime.datetime.min.time())
+    
+    
+    print("Retrieving blood oxygen data")
+    band_data_url=f"https://api-mifit.zepp.com/users/{auth_info['token_info']['user_id']}/events"
+    headers={
+        'apptoken': auth_info['token_info']['app_token'],
+    }
+    data={
+        'from': query_start.strftime('%s000'),
+        'to': today_end.strftime('%s000'),
+        "eventType": "blood_oxygen",
+        "limit": 1000,
+        "timeZone" : "Europe/London"
+    }
+    response=requests.get(band_data_url,params=data,headers=headers)
+    r_json = response.json()
+
+    if "items" not in r_json:
+        return rows
+    
+    for blood in r_json['items']:
+        if blood['subType'] == "odi":
+            rows.append(processODIEvent(blood))
+        elif blood['subType'] == "osa_event":
+            rows.append(processOSAEvent(blood))
+
+
+    return rows
+
+def processOSAEvent(record):
+    ''' Process a possible Obstructive Sleep Apnea event
+    '''
+    
+    osa_record = json.loads(record['extra'])
+    
+    return {
+        "timestamp": int(record['timestamp']) * 1000000, # Convert to nanos 
+        "fields" : {
+            "spo2_decrease" : float(osa_record['spo2_decrease']),
+            },
+        "tags" : {
+            "blood_event" : "osa"
+            }
+    }           
+
+    
+def processODIEvent(record):
+    ''' Process an ODI event
+    '''
+    return {
+        "timestamp": int(record['timestamp']) * 1000000, # Convert to nanos 
+        "fields" : {
+            "odi_read" : float(record['odi']),
+            # Not sure what this is, skipping for now 
+            # (I *think* it might just be a record ID)
+            # "odi_number" : int(record['odiNum']),
+            #
+            # There are also "cost" and "valid"
+            "score" : float(record['score']),
+            },
+        "tags" : {
+            "blood_event" : "odi"
+            }
+    }       
+
 def get_stress_data(auth_info, config):    
     ''' Retrieve stress level information
     '''
@@ -444,7 +522,7 @@ def get_stress_data(auth_info, config):
     response=requests.get(band_data_url,params=data,headers=headers)
     r_json = response.json()
     if "items" not in r_json:
-        return result_set
+        return rows
     
     for stress in r_json['items']:
         row = {
@@ -537,6 +615,13 @@ def main():
         result_set = result_set + stress_rows
     except:
         print("Failed to collect stress data")
+    
+    
+    try:
+        blood_o2 = get_blood_oxygen_data(auth_info, config)
+        result_set = result_set + blood_o2
+    except:
+        print("Failed to collect blood oxygen data")
     
     # Write into InfluxDB
     write_results(result_set, serial, config)
