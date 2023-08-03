@@ -331,7 +331,7 @@ def minute_to_timestamp(minute, day):
     epoch = int(datetime.datetime.strptime(date_string, "%Y-%m-%d %H:%M").strftime('%s'))
     return epoch
     
-    
+  
 def get_band_data(auth_info, config):
     ''' Retrieve information for the band/watch associated with the account
     '''
@@ -414,6 +414,73 @@ def get_band_data(auth_info, config):
                 
     return result_set, serial
 
+
+def get_stress_data(auth_info, config):    
+    ''' Retrieve stress level information
+    '''
+    rows = []
+    
+    ''' calculate the times that the api query should check between
+    '''
+    today = datetime.datetime.today()
+    today_end = datetime.datetime.combine(today, datetime.datetime.max.time()) 
+    
+    query_start_d = today - datetime.timedelta(days=config['QUERY_DURATION'])
+    # Make it midnight  - the api doesn't seem to like mid-day queries
+    query_start = datetime.datetime.combine(query_start_d, datetime.datetime.min.time())
+    
+    
+    print("Retrieving stress data")
+    band_data_url=f"https://api-mifit.zepp.com/users/{auth_info['token_info']['user_id']}/events"
+    headers={
+        'apptoken': auth_info['token_info']['app_token'],
+    }
+    data={
+        'from': query_start.strftime('%s000'),
+        'to': today_end.strftime('%s000'),
+        "eventType": "all_day_stress",
+        "limit": 1000
+    }
+    response=requests.get(band_data_url,params=data,headers=headers)
+    r_json = response.json()
+    if "items" not in r_json:
+        return result_set
+    
+    for stress in r_json['items']:
+        row = {
+            "timestamp": int(stress['timestamp']) * 1000000, # Convert to nanos 
+            "fields" : {
+                "minimum_stress_level" : int(stress['minStress']),
+                "max_stress_level" : int(stress['maxStress']),
+                "mean_stress_level" : int(stress['avgStress']),
+                "relaxed_time_perc" : int(stress['relaxProportion']),
+                "normal_stress_time_perc" : int(stress['normalProportion']),
+                "medium_stress_time_perc" : int(stress['mediumProportion']),
+                "high_stress_time_perc" : int(stress['highProportion'])
+                },
+            "tags" : {
+                "stress" : "daily"
+                }
+        }           
+        rows.append(row)
+        
+        # See whether we've been provided regular reads
+        if "data" in stress:
+            stress_dump = json.loads(stress['data'])
+            for stresspoint in stress_dump:
+                row = {
+                    "timestamp": int(stresspoint['time']) * 1000000, # Convert to nanos 
+                    "fields" : {
+                        "current_stress_level" : int(stresspoint['value'])
+                        },
+                    "tags" : {
+                        "stress" : "point_in_time"
+                        }
+                }           
+                rows.append(row)                
+
+    return rows
+
 def write_results(results, serial, config):
     ''' Open a connection to InfluxDB and write the results in
     '''
@@ -464,6 +531,12 @@ def main():
     
     # Fetch band info
     result_set, serial = get_band_data(auth_info, config)
+    
+    try:
+        stress_rows = get_stress_data(auth_info, config)
+        result_set = result_set + stress_rows
+    except:
+        print("Failed to collect stress data")
     
     # Write into InfluxDB
     write_results(result_set, serial, config)
