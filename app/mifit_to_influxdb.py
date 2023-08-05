@@ -201,7 +201,7 @@ def extract_sleep_data(ts, slp, day):
         
     # Add a field for each of the recorded stages_counters 
     for stage in stages_counters:
-        row['fields'][f"recorded_{stage}_events"] = stages_counters[stage]
+        row['fields'][f"recorded_sleep_{stage}_events"] = stages_counters[stage]
         
     # Add the record
     rows.append(row)    
@@ -315,7 +315,7 @@ def extract_step_data(ts, stp, day):
         "tags" : {}
     }
     for activity in activity_counters:
-        row['fields'][f"recorded_{activity}_events"] = activity_counters[activity]
+        row['fields'][f"recorded_activity_{activity}_events"] = activity_counters[activity]
     rows.append(row)
         
             
