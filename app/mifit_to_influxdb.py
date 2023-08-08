@@ -480,10 +480,30 @@ def get_blood_oxygen_data(auth_info, config):
             rows.append(processODIEvent(blood))
         elif blood['subType'] == "osa_event":
             rows.append(processOSAEvent(blood))
+        elif blood['subType'] == "click":
+            rows.append(processBloodClickEvent(blood))
 
 
     return rows
 
+def processBloodClickEvent(record):
+    ''' Process a "click" event
+    
+    This appears to be the user manually triggering a blood
+    oxygen reading from the watch/band (utilities/zepp_to_influxdb#6)
+    '''
+    extra = json.loads(record['extra'])
+    return {
+        "timestamp": int(record['timestamp']) * 1000000, # Convert to nanos 
+        "fields" : {
+            "spo2_level" : float(extra['spo2']),
+            },
+        "tags" : {
+            "blood_event" : "manual_read"
+            }
+    }   
+        
+    
 def processOSAEvent(record):
     ''' Process a possible Obstructive Sleep Apnea event
     '''
