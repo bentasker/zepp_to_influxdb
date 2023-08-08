@@ -321,7 +321,7 @@ def get_band_data(auth_info, config):
         'apptoken': auth_info['token_info']['app_token'],
     }
     data={
-        'query_type': 'summary',
+        'query_type': 'detail',
         'device_type': 'android_phone',
         'userid': auth_info['token_info']['user_id'],
         'from_date': query_start.strftime('%Y-%m-%d'),
@@ -342,6 +342,10 @@ def get_band_data(auth_info, config):
         else:
             ts = today_ts
         
+        if "data_hr" in daydata:
+            print("Extracting heart rate")
+            result_set = result_set + translate_heartrate_blob(daydata)
+            
         summary=json.loads(base64.b64decode(daydata['summary']))
         for k,v in summary.items():
             if k=='stp':
@@ -370,10 +374,74 @@ def get_band_data(auth_info, config):
                 })                
             else:
                 print(f"Skipped {k} = {v}")
-                
+            
+            
     return result_set, serial
 
 
+def translate_heartrate_blob(daydata):
+    ''' Extract the heart rate data blob from the JSON
+    and convert to a list of stats
+    
+    '''
+    
+    # Create a datetime object from the date specified in JSON
+    # this will be midnight.
+    nowtime = datetime.datetime.strptime(daydata['date_time'], "%Y-%m-%d")
+        
+    number_blob = bytearray(base64.b64decode(daydata['data_hr']))
+    #print(number_blob)
+    adjusted_vals = []
+    
+    # Initialise values
+    x = 1
+    b=b''    
+   
+    # Iterate through the bytestring
+    for byte_i in number_blob:
+        # iterating over leads to us fetching ints
+        # not bytes, so convert back
+        byte = byte_i.to_bytes(length=1, byteorder="big")
+        
+        # Concatenate this byte onto the previous
+        b += byte
+        
+        # Move the marker to the right
+        x += 1
+        
+        # The data is a java short, so every
+        # 2 bytes, convert it to an integer
+        if x == 2:            
+            # Convert the bytestring to an int
+            v = int(b.hex(), 16)
+            
+            # Adjust the timestamp forward 1 minute
+            nowtime = nowtime + datetime.timedelta(minutes=1)
+            
+            # They seem to use a high initialisation
+            # value to indicate lack of data. If it's
+            # higher than 200 skip it
+            if v < 200:
+                # Append a point
+                adjusted_vals.append({
+                        "timestamp": int(nowtime.strftime('%s')) * 1000000000, # Convert to nanos
+                        "fields" : {
+                            "heart_rate" : int(v),
+                            },
+                        "tags" : {
+                            "hr_measure" : "periodic"
+                            }
+                    })
+                
+            
+            # Reset the byte string
+            b = b''
+            # Reset the counter
+            x = 1
+
+    return adjusted_vals
+    
+    
 def get_blood_oxygen_data(auth_info, config):    
     ''' Retrieve stress level information
     '''
