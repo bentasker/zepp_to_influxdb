@@ -95,24 +95,6 @@ def minutes_as_time(minutes):
     '''
     return "{:02d}:{:02d}".format((minutes//60)%24,minutes%60)
 
-def dump_sleep_data(day, slp):
-    ''' Output the collected sleep data 
-    '''
-    print("Total sleep: ",minutes_as_time(slp['lt']+slp['dp']),
-        ", deep sleep",minutes_as_time(slp['dp']),
-        ", light sleep",minutes_as_time(slp['lt']),
-        ", slept from",datetime.datetime.fromtimestamp(slp['st']),
-        "until",datetime.datetime.fromtimestamp(slp['ed']))
-    if 'stage' in slp:
-        for sleep in slp['stage']:
-            if sleep['mode']==4:
-                sleep_type='light sleep'
-            elif sleep['mode']==5:
-                sleep_type='deep sleep'
-            else:
-                sleep_type="unknown sleep type: {}".format(sleep['mode'])
-            print(format(minutes_as_time(sleep['start'])),"-",minutes_as_time(),
-                sleep_type)
 
 def extract_sleep_data(ts, slp, day):
     ''' Extract sleep data and format it for feeding into InfluxDB
@@ -208,27 +190,6 @@ def extract_sleep_data(ts, slp, day):
     
     return rows
     
-    
-    
-    
-def dump_step_data(day, stp):
-    ''' Output the collected step data 
-    '''
-    print("Total steps: ",stp['ttl'],", used",stp['cal'],"kcals",", walked",stp['dis'],"meters")
-    if 'stage' in stp:
-        for activity in stp['stage']:
-            if activity['mode']==1:
-                activity_type='slow walking'
-            elif activity['mode']==3:
-                activity_type='fast walking'
-            elif activity['mode']==4:
-                activity_type='running'
-            elif activity['mode']==7:
-                activity_type='light activity'
-            else:
-                activity_type="unknown activity type: {}".format(activity['mode'])
-            print(format(minutes_as_time(activity['start'])),"-",minutes_as_time(activity['stop']),
-                activity['step'],'steps',activity_type)
 
 def extract_step_data(ts, stp, day):
     ''' Extract step data and return in a format ready for feeding
@@ -384,11 +345,9 @@ def get_band_data(auth_info, config):
         summary=json.loads(base64.b64decode(daydata['summary']))
         for k,v in summary.items():
             if k=='stp':
-                # dump_step_data(day,v)
                 # Extract step data
                 result_set = result_set + extract_step_data(ts, v, day)
             elif k=='slp':
-                # dump_sleep_data(day,v)
                 # Extract the data
                 result_set = result_set + extract_sleep_data(ts, v, day)
             elif k == "goal":
