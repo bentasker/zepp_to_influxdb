@@ -4,11 +4,13 @@ This script connects to the Zepp/MiFit/Huami/Amznfit smart watch API in order to
 
 The underlying connectivity approach is taken from [Reverse engineering of the Mi Fit API](https://github.com/micw/hacking-mifit-api/blob/master/README.md) .
 
-I put this script together in order to collect data from my Amznfit Bip 3 Pro, having found that [the Bip 3 doesn't work with Gadgetbridge](https://projects.bentasker.co.uk/gils_projects/issue/jira-projects/MISC/34.html).
+I put this script together in order to collect data from my Amznfit Bip 3 Pro, having found that [the Bip 3 didn't work with Gadgetbridge](https://projects.bentasker.co.uk/gils_projects/issue/jira-projects/MISC/34.html).
 
 Design details can be found in [MISC#35](https://projects.bentasker.co.uk/gils_projects/issue/jira-projects/MISC/35.html).
 
 The app seems to update values irregularly, so hourly runs should be more than sufficient.
+
+Note: Bip 3 support has since [been added](https://codeberg.org/Freeyourgadget/Gadgetbridge/issues/3249#) to Gadgetbridge, so I've [changed approach](https://www.bentasker.co.uk/posts/blog/software-development/linking-a-bip3-smartwatch-with-gadgetbridge-to-write-stats-to-influxdb.html) and so am unlikely to add to this codebase any further.
 
 ----
 
