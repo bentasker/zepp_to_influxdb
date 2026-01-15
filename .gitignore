@@ -1,3 +1,11 @@
 *pyc
 *bk
 *swp
+
+# Sensitive files
+.env
+.env.*
+
+# Data files
+data/
+*.log
