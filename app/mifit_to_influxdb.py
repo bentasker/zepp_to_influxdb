@@ -773,13 +773,24 @@ def main():
     # Get the Zepp credentials
     config['ZEPP_EMAIL'] = os.getenv("ZEPP_EMAIL", False)
     config['ZEPP_PASS'] = os.getenv("ZEPP_PASS", False)
-    
-    if not config['ZEPP_EMAIL'] or not config['ZEPP_PASS']:
-        print("Error: Credentials not provided")
+    config['ZEPP_APP_TOKEN'] = os.getenv("ZEPP_APP_TOKEN", "")
+    config['ZEPP_USER_ID'] = os.getenv("ZEPP_USER_ID", "")
+
+    # Check for pre-configured token (bypasses rate-limited login)
+    if config['ZEPP_APP_TOKEN'] and config['ZEPP_USER_ID']:
+        print("Using pre-configured app_token (bypassing login)")
+        auth_info = {
+            'token_info': {
+                'app_token': config['ZEPP_APP_TOKEN'],
+                'user_id': config['ZEPP_USER_ID']
+            }
+        }
+    elif config['ZEPP_EMAIL'] and config['ZEPP_PASS']:
+        # Get logged in
+        auth_info = mifit_auth_email(config['ZEPP_EMAIL'], config['ZEPP_PASS'])
+    else:
+        print("Error: Provide ZEPP_APP_TOKEN+ZEPP_USER_ID or ZEPP_EMAIL+ZEPP_PASS")
         sys.exit(1)
-    
-    # Get logged in
-    auth_info=mifit_auth_email(config['ZEPP_EMAIL'], config['ZEPP_PASS'])
     
     # Fetch band info
     result_set, serial = get_band_data(auth_info, config)
