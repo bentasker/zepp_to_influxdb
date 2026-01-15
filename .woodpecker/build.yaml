@@ -1,0 +1,35 @@
+when:
+  - event: push
+    branch: main
+  - event: tag    
+  - event: cron
+    cron: Weekly
+
+steps:
+- name: publish
+  image: woodpeckerci/plugin-docker-buildx
+  when:
+    - event: push
+    - event: tag  
+  settings:
+    repo: bentasker12/zepp_to_influxdb
+    platforms: linux/amd64,linux/arm64/v8
+    tags: ['${CI_COMMIT_SHA:0:8}', latest]
+    auto_tag: true
+    username:
+      from_secret: docker_username
+    password:
+      from_secret: docker_password  
+
+- name: publish Weekly
+  image: woodpeckerci/plugin-docker-buildx
+  when:
+    - event: cron 
+  settings:
+    repo: bentasker12/zepp_to_influxdb
+    platforms: linux/amd64,linux/arm64/v8
+    tags: weekly
+    username:
+      from_secret: docker_username
+    password:
+      from_secret: docker_password        
